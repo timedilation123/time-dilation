@@ -17,24 +17,12 @@
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            position: relative;
-            overflow: hidden; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.7);
         }
         
-        .stars-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        .clock-label { font-size: 1.4rem; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px; z-index: 2; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        .clock-label { font-size: 1.4rem; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px; }
         
-        .analog-clock { width: 140px; height: 140px; background-color: white; border-radius: 50%; position: relative; border: 4px solid #333; z-index: 2; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .analog-clock { width: 140px; height: 140px; background-color: white; border-radius: 50%; position: relative; border: 4px solid #333; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .analog-clock::after { content: ''; position: absolute; width: 10px; height: 10px; background-color: black; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; }
         
         .ticks { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
@@ -62,7 +50,6 @@
         <div class="clocks-container">
             <!-- Observer -->
             <div class="clock-box">
-                <canvas class="stars-canvas" id="obs-canvas"></canvas>
                 <div class="clock-label">Observer</div>
                 <div class="analog-clock">
                     <div class="ticks" id="obs-ticks"></div>
@@ -73,7 +60,6 @@
             
             <!-- Traveler -->
             <div class="clock-box">
-                <canvas class="stars-canvas" id="trav-canvas"></canvas>
                 <div class="clock-label">Traveler</div>
                 <div class="analog-clock">
                     <div class="ticks" id="trav-ticks"></div>
@@ -118,37 +104,8 @@
         const travHandMin = document.getElementById('trav-hand-min');
         const travHandSec = document.getElementById('trav-hand-sec');
 
-        const obsCanvas = document.getElementById('obs-canvas');
-        const travCanvas = document.getElementById('trav-canvas');
-        const obsCtx = obsCanvas.getContext('2d');
-        const travCtx = travCanvas.getContext('2d');
-
-        // Bezpečné nastavení rozměrů canvasu
-        obsCanvas.width = 260; obsCanvas.height = 300;
-        travCanvas.width = 260; travCanvas.height = 300;
-
-        const numStars = 40;
-        const obsStars = [];
-        const travStars = [];
-
-        for (let i = 0; i < numStars; i++) {
-            obsStars.push({
-                x: Math.random() * 260,
-                y: Math.random() * 300,
-                size: Math.random() * 1.5 + 0.5,
-                speed: Math.random() * 0.2 + 0.05
-            });
-            travStars.push({
-                x: Math.random() * 260 - 130,
-                y: Math.random() * 300 - 150,
-                z: Math.random() * 260 + 1,
-                size: Math.random() * 1.5 + 0.5
-            });
-        }
-
         function createClockTicks(containerId) {
             const container = document.getElementById(containerId);
-            if (!container) return;
             for (let i = 0; i < 12; i++) {
                 const tick = document.createElement('div');
                 tick.classList.add('tick');
@@ -163,7 +120,7 @@
         function loop(timestamp) {
             if (!lastTimestamp) lastTimestamp = timestamp;
             let elapsed = timestamp - lastTimestamp;
-            if (elapsed > 100) elapsed = 16; // Ochrana proti zásekům při přepínání karet
+            if (elapsed > 100) elapsed = 16;
             lastTimestamp = timestamp;
 
             let currentSpeed = parseFloat(speedSlider.value || 0);
@@ -172,35 +129,24 @@
             observerTime += elapsed;
             travelerTime += elapsed * lorentz;
 
-            // Pohyb ručiček (360 stupňů za vteřinu / minutu)
-            if (obsHandSec) obsHandSec.style.transform = `translateX(-50%) rotate(${(observerTime / 1000) * 360}deg)`;
-            if (obsHandMin) obsHandMin.style.transform = `translateX(-50%) rotate(${(observerTime / 60000) * 360}deg)`;
-            if (travHandSec) travHandSec.style.transform = `translateX(-50%) rotate(${(travelerTime / 1000) * 360}deg)`;
-            if (travHandMin) travHandMin.style.transform = `translateX(-50%) rotate(${(travelerTime / 60000) * 360}deg)`;
+            // Otáčení ručiček: vteřinová (červená) dá 360 stupňů za 1 sekundu (1000ms)
+            obsHandSec.style.transform = `translateX(-50%) rotate(${(observerTime / 1000) * 360}deg)`;
+            obsHandMin.style.transform = `translateX(-50%) rotate(${(observerTime / 60000) * 360}deg)`;
+            
+            travHandSec.style.transform = `translateX(-50%) rotate(${(travelerTime / 1000) * 360}deg)`;
+            travHandMin.style.transform = `translateX(-50%) rotate(${(travelerTime / 60000) * 360}deg)`;
 
-            // Hvězdy Observer
-            if (obsCtx) {
-                obsCtx.clearRect(0, 0, 260, 300);
-                obsCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-                obsStars.forEach(star => {
-                    obsCtx.beginPath();
-                    obsCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-                    obsCtx.fill();
-                    star.y += star.speed;
-                    if (star.y > 300) star.y = 0;
-                });
-            }
+            requestAnimationFrame(loop);
+        }
 
-            // Hvězdy Traveler (Warp)
-            if (travCtx) {
-                travCtx.clearRect(0, 0, 260, 300);
-                let warpSpeed = 0.5 + (currentSpeed * 15); 
-                let centerX = 130;
-                let centerY = 150;
+        speedSlider.addEventListener('input', () => {
+            let currentSpeed = parseFloat(speedSlider.value || 0);
+            let lorentz = Math.sqrt(1 - Math.pow(currentSpeed, 2));
+            speedVal.textContent = `v = ${currentSpeed.toFixed(2)}c`;
+            comparisonText.textContent = `${lorentz.toFixed(3)} year`;
+        });
 
-                travStars.forEach(star => {
-                    star.z -= warpSpeed;
-                    if (star.z <= 0) {
-                        star.z = 260;
-                        star.x = Math.random() * 260 - centerX;
-                        star.y = Math.random() * 300 - centerY;
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
