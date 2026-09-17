@@ -8,7 +8,6 @@
         .simulator-section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; position: relative; }
         .clocks-container { display: flex; justify-content: center; align-items: center; gap: 60px; margin-bottom: 40px; }
         
-        /* Boxy pro hodiny s vesmírným pozadím */
         .clock-box { 
             background-color: #000000; 
             border: 3px solid white; 
@@ -124,12 +123,9 @@
         const obsCtx = obsCanvas.getContext('2d');
         const travCtx = travCanvas.getContext('2d');
 
-        function resizeCanvases() {
-            [obsCanvas, travCanvas].forEach(canvas => {
-                canvas.width = canvas.parentElement.clientWidth;
-                canvas.height = canvas.parentElement.clientHeight;
-            });
-        }
+        // Bezpečné nastavení rozměrů canvasu
+        obsCanvas.width = 260; obsCanvas.height = 300;
+        travCanvas.width = 260; travCanvas.height = 300;
 
         const numStars = 40;
         const obsStars = [];
@@ -138,20 +134,21 @@
         for (let i = 0; i < numStars; i++) {
             obsStars.push({
                 x: Math.random() * 260,
-                y: Math.random() * 250,
+                y: Math.random() * 300,
                 size: Math.random() * 1.5 + 0.5,
                 speed: Math.random() * 0.2 + 0.05
             });
             travStars.push({
                 x: Math.random() * 260 - 130,
-                y: Math.random() * 250 - 125,
-                z: Math.random() * 260,
+                y: Math.random() * 300 - 150,
+                z: Math.random() * 260 + 1,
                 size: Math.random() * 1.5 + 0.5
             });
         }
 
         function createClockTicks(containerId) {
             const container = document.getElementById(containerId);
+            if (!container) return;
             for (let i = 0; i < 12; i++) {
                 const tick = document.createElement('div');
                 tick.classList.add('tick');
@@ -166,45 +163,44 @@
         function loop(timestamp) {
             if (!lastTimestamp) lastTimestamp = timestamp;
             let elapsed = timestamp - lastTimestamp;
+            if (elapsed > 100) elapsed = 16; // Ochrana proti zásekům při přepínání karet
             lastTimestamp = timestamp;
 
-            let currentSpeed = parseFloat(speedSlider.value);
+            let currentSpeed = parseFloat(speedSlider.value || 0);
             let lorentz = Math.sqrt(1 - Math.pow(currentSpeed, 2));
 
             observerTime += elapsed;
             travelerTime += elapsed * lorentz;
 
-            let obsSecDeg = (observerTime / 1000) * 360;
-            let obsMinDeg = (observerTime / 60000) * 360;
-            obsHandSec.style.transform = `translateX(-50%) rotate(${obsSecDeg}deg)`;
-            obsHandMin.style.transform = `translateX(-50%) rotate(${obsMinDeg}deg)`;
+            // Pohyb ručiček (360 stupňů za vteřinu / minutu)
+            if (obsHandSec) obsHandSec.style.transform = `translateX(-50%) rotate(${(observerTime / 1000) * 360}deg)`;
+            if (obsHandMin) obsHandMin.style.transform = `translateX(-50%) rotate(${(observerTime / 60000) * 360}deg)`;
+            if (travHandSec) travHandSec.style.transform = `translateX(-50%) rotate(${(travelerTime / 1000) * 360}deg)`;
+            if (travHandMin) travHandMin.style.transform = `translateX(-50%) rotate(${(travelerTime / 60000) * 360}deg)`;
 
-            let travSecDeg = (travelerTime / 1000) * 360;
-            let travMinDeg = (travelerTime / 60000) * 360;
-            travHandSec.style.transform = `translateX(-50%) rotate(${travSecDeg}deg)`;
-            travHandMin.style.transform = `translateX(-50%) rotate(${travMinDeg}deg)`;
+            // Hvězdy Observer
+            if (obsCtx) {
+                obsCtx.clearRect(0, 0, 260, 300);
+                obsCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                obsStars.forEach(star => {
+                    obsCtx.beginPath();
+                    obsCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                    obsCtx.fill();
+                    star.y += star.speed;
+                    if (star.y > 300) star.y = 0;
+                });
+            }
 
-            obsCtx.clearRect(0, 0, obsCanvas.width, obsCanvas.height);
-            obsCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-            obsStars.forEach(star => {
-                obsCtx.beginPath();
-                obsCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-                obsCtx.fill();
-                star.y += star.speed;
-                if (star.y > obsCanvas.height) {
-                    star.y = 0;
-                    star.x = Math.random() * obsCanvas.width;
-                }
-            });
+            // Hvězdy Traveler (Warp)
+            if (travCtx) {
+                travCtx.clearRect(0, 0, 260, 300);
+                let warpSpeed = 0.5 + (currentSpeed * 15); 
+                let centerX = 130;
+                let centerY = 150;
 
-            travCtx.clearRect(0, 0, travCanvas.width, travCanvas.height);
-            
-            let warpSpeed = 0.5 + (currentSpeed * 15); 
-            let centerX = travCanvas.width / 2;
-            let centerY = travCanvas.height / 2;
-
-            travStars.forEach(star => {
-                star.z -= warpSpeed;
-                if (star.z <= 0) {
-                    star.z = travCanvas.width;
-                    star.x = Math.random() * travCanvas.width - centerX;
+                travStars.forEach(star => {
+                    star.z -= warpSpeed;
+                    if (star.z <= 0) {
+                        star.z = 260;
+                        star.x = Math.random() * 260 - centerX;
+                        star.y = Math.random() * 300 - centerY;
