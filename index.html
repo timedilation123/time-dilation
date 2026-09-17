@@ -4,30 +4,53 @@
     <meta charset="UTF-8">
     <title>Simulátor dilatace času</title>
     <style>
-        body { margin: 0; padding: 0; background-color: #6a2c70; font-family: 'Courier New', monospace; color: white; display: flex; flex-direction: column; align-items: center; }
+        body { margin: 0; padding: 0; background-color: #32103c; font-family: 'Courier New', monospace; color: white; display: flex; flex-direction: column; align-items: center; }
         .simulator-section { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 20px; position: relative; }
-        .clocks-container { display: flex; justify-content: center; align-items: center; gap: 60px; margin-bottom: 20px; }
-        .clock-box { background-color: #000000; border: 3px solid white; border-radius: 8px; padding: 30px; width: 260px; display: flex; flex-direction: column; align-items: center; }
-        .clock-label { font-size: 1.2rem; margin-bottom: 15px; text-transform: uppercase; }
+        .clocks-container { display: flex; justify-content: center; align-items: center; gap: 60px; margin-bottom: 40px; }
         
-        /* Styl ciferníku a značek */
-        .analog-clock { width: 140px; height: 140px; background-color: white; border-radius: 50%; position: relative; margin-bottom: 15px; border: 4px solid #333; }
+        /* Boxy pro hodiny s vesmírným pozadím */
+        .clock-box { 
+            background-color: #000000; 
+            border: 3px solid white; 
+            border-radius: 8px; 
+            padding: 40px 30px; 
+            width: 260px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            position: relative;
+            overflow: hidden; /* Aby hvězdy nelétaly ven z boxu */
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        
+        /* Canvas pro vykreslení animovaných hvězd */
+        .stars-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .clock-label { font-size: 1.4rem; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px; z-index: 2; text-shadow: 0 2px 4px rgba(0,0,0,0.8); }
+        
+        /* Ručičkové hodiny vytažené do popředí */
+        .analog-clock { width: 140px; height: 140px; background-color: white; border-radius: 50%; position: relative; border: 4px solid #333; z-index: 2; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .analog-clock::after { content: ''; position: absolute; width: 10px; height: 10px; background-color: black; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 10; }
         
-        /* Značky na ciferníku */
         .ticks { position: absolute; width: 100%; height: 100%; top: 0; left: 0; }
         .tick { position: absolute; width: 2px; height: 8px; background-color: #333; top: 2px; left: 69px; transform-origin: center 68px; }
         .tick.large { width: 4px; height: 14px; top: 0; left: 68px; background-color: #000; }
 
-        /* Ručičky */
         .clock-hand { position: absolute; background-color: black; bottom: 50%; left: 50%; transform-origin: bottom center; transform: translateX(-50%) rotate(0deg); }
-        .hand-minute { width: 4px; height: 45px; background-color: #333; } /* Kratší minutová */
-        .hand-second { width: 2px; height: 58px; background-color: #d9534f; } /* Dlouhá vteřinová (červená/výrazná) */
+        .hand-minute { width: 4px; height: 45px; background-color: #333; }
+        .hand-second { width: 2px; height: 58px; background-color: #d9534f; }
 
-        .digital-time { font-size: 1.5rem; font-weight: bold; background: #222; padding: 5px 15px; border-radius: 4px; border: 1px solid #444; min-width: 140px; text-align: center; }
-        .comparison-container { display: flex; justify-content: center; align-items: center; gap: 20px; font-size: 1.4rem; margin-bottom: 45px; font-weight: bold; background-color: rgba(0,0,0,0.2); padding: 10px 30px; border-radius: 20px; }
+        .comparison-container { display: flex; justify-content: center; align-items: center; gap: 20px; font-size: 1.4rem; margin-bottom: 45px; font-weight: bold; background-color: rgba(0,0,0,0.4); padding: 10px 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
         .comp-val { min-width: 100px; text-align: center; }
-        .slider-wrapper { display: flex; align-items: center; gap: 20px; width: 80%; max-width: 800px; background: rgba(0,0,0,0.4); padding: 20px; border-radius: 10px; border: 2px solid white; }
+        .slider-wrapper { display: flex; align-items: center; gap: 20px; width: 80%; max-width: 800px; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px; border: 2px solid white; }
         .slider-label { font-size: 1.3rem; font-weight: bold; }
         .slider-container { flex-grow: 1; display: flex; align-items: center; }
         .custom-slider { -webkit-appearance: none; width: 100%; height: 15px; background: #555; outline: none; border: 2px solid white; border-radius: 5px; }
@@ -42,24 +65,24 @@
         <div class="clocks-container">
             <!-- Observer -->
             <div class="clock-box">
+                <canvas class="stars-canvas" id="obs-canvas"></canvas>
                 <div class="clock-label">Observer</div>
                 <div class="analog-clock">
                     <div class="ticks" id="obs-ticks"></div>
                     <div class="clock-hand hand-minute" id="obs-hand-min"></div>
                     <div class="clock-hand hand-second" id="obs-hand-sec"></div>
                 </div>
-                <div class="digital-time" id="obs-digital">00:00:00</div>
             </div>
             
             <!-- Traveler -->
             <div class="clock-box">
+                <canvas class="stars-canvas" id="trav-canvas"></canvas>
                 <div class="clock-label">Traveler</div>
                 <div class="analog-clock">
                     <div class="ticks" id="trav-ticks"></div>
                     <div class="clock-hand hand-minute" id="trav-hand-min"></div>
                     <div class="clock-hand hand-second" id="trav-hand-sec"></div>
                 </div>
-                <div class="digital-time" id="trav-digital">00:00:00</div>
             </div>
         </div>
 
@@ -93,21 +116,52 @@
         const speedVal = document.getElementById('speed-val');
         const comparisonText = document.getElementById('comparison-text');
         
-        const obsDigital = document.getElementById('obs-digital');
-        const travDigital = document.getElementById('trav-digital');
-        
         const obsHandMin = document.getElementById('obs-hand-min');
         const obsHandSec = document.getElementById('obs-hand-sec');
         const travHandMin = document.getElementById('trav-hand-min');
         const travHandSec = document.getElementById('trav-hand-sec');
 
-        // Generování 12 čárek pro oba ciferníky
+        // Nastavení pláten pro hvězdy
+        const obsCanvas = document.getElementById('obs-canvas');
+        const travCanvas = document.getElementById('trav-canvas');
+        const obsCtx = obsCanvas.getContext('2d');
+        const travCtx = travCanvas.getContext('2d');
+
+        function resizeCanvases() {
+            [obsCanvas, travCanvas].forEach(canvas => {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+            });
+        }
+
+        // Generování dat pro hvězdy
+        const numStars = 40;
+        const obsStars = [];
+        const travStars = [];
+
+        for (let i = 0; i < numStars; i++) {
+            // Hvězdy pro Observera (plují náhodně do stran)
+            obsStars.push({
+                x: Math.random() * 260,
+                y: Math.random() * 250,
+                size: Math.random() * 1.5 + 0.5,
+                speed: Math.random() * 0.2 + 0.05
+            });
+            // Hvězdy pro Travelera (létají ze středu ven - warp efekt)
+            travStars.push({
+                x: Math.random() * 260 - 130,
+                y: Math.random() * 250 - 125,
+                z: Math.random() * 260,
+                size: Math.random() * 1.5 + 0.5
+            });
+        }
+
+        // Vytvoření 12 čárek ciferníku
         function createClockTicks(containerId) {
             const container = document.getElementById(containerId);
             for (let i = 0; i < 12; i++) {
                 const tick = document.createElement('div');
                 tick.classList.add('tick');
-                // Každá třetí čárka (12, 3, 6, 9 hodin) bude větší
                 if (i % 3 === 0) tick.classList.add('large');
                 tick.style.transform = `rotate(${i * 30}deg)`;
                 container.appendChild(tick);
@@ -115,14 +169,6 @@
         }
         createClockTicks('obs-ticks');
         createClockTicks('trav-ticks');
-
-        function formatTime(ms) {
-            let totalSeconds = Math.floor(ms / 1000);
-            let centiseconds = Math.floor((ms % 1000) / 10);
-            let seconds = totalSeconds % 60;
-            let minutes = Math.floor(totalSeconds / 60);
-            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${centiseconds.toString().padStart(2, '0')}`;
-        }
 
         function loop(timestamp) {
             if (!lastTimestamp) lastTimestamp = timestamp;
@@ -132,37 +178,32 @@
             let currentSpeed = parseFloat(speedSlider.value);
             let lorentz = Math.sqrt(1 - Math.pow(currentSpeed, 2));
 
-            // Čas běží v reálném tempu (1s reálná = 1s na webu)
             observerTime += elapsed;
             travelerTime += elapsed * lorentz;
 
-            // Update digitálních stopek
-            obsDigital.textContent = formatTime(observerTime);
-            travDigital.textContent = formatTime(travelerTime);
-
-            // Výpočty rotací pro Observera
-            let obsSecDeg = (observerTime / 1000) * 360; // 360 stupňů za vteřinu
-            let obsMinDeg = (observerTime / 60000) * 360; // 360 stupňů za minutu
+            // Rotace ručiček
+            let obsSecDeg = (observerTime / 1000) * 360;
+            let obsMinDeg = (observerTime / 60000) * 360;
             obsHandSec.style.transform = `translateX(-50%) rotate(${obsSecDeg}deg)`;
             obsHandMin.style.transform = `translateX(-50%) rotate(${obsMinDeg}deg)`;
 
-            // Výpočty rotací pro Travelera (zpomalené Lorentzovým faktorem)
             let travSecDeg = (travelerTime / 1000) * 360;
             let travMinDeg = (travelerTime / 60000) * 360;
             travHandSec.style.transform = `translateX(-50%) rotate(${travSecDeg}deg)`;
             travHandMin.style.transform = `translateX(-50%) rotate(${travMinDeg}deg)`;
 
-            requestAnimationFrame(loop);
-        }
+            // --- ANIMACE HVĚZD (OBSERVER) ---
+            obsCtx.clearRect(0, 0, obsCanvas.width, obsCanvas.height);
+            obsCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            obsStars.forEach(star => {
+                obsCtx.beginPath();
+                obsCtx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                obsCtx.fill();
+                // Hvězdy se pomalu posouvají dolů
+                star.y += star.speed;
+                if (star.y > obsCanvas.height) {
+                    star.y = 0;
+                    star.x = Math.random() * obsCanvas.width;
+                }
+            });
 
-        speedSlider.addEventListener('input', () => {
-            let currentSpeed = parseFloat(speedSlider.value);
-            let lorentz = Math.sqrt(1 - Math.pow(currentSpeed, 2));
-            speedVal.textContent = `v = ${currentSpeed.toFixed(2)}c`;
-            comparisonText.textContent = `${lorentz.toFixed(3)} year`;
-        });
-
-        requestAnimationFrame(loop);
-    </script>
-</body>
-</html>
